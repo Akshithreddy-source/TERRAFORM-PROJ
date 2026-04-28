@@ -1,18 +1,11 @@
 output "alb_dns" {
-  value = module.alb.alb_dns
+  value = aws_lb.alb.dns_name
 }
+
 output "target_group_arn" {
-  value = module.alb.target_group_arn
-}
-output "vpc_id" {
-  value = module.vpc.vpc_id
+  value = aws_lb_target_group.tg.arn
 }
 
-output "public_subnets" {
-  value = module.vpc.public_subnets
+output "alb_sg" {
+  value = aws_security_group.alb_sg.id
 }
-
-output "private_subnets" {
-  value = module.vpc.private_subnets
-}
-
