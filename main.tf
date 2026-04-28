@@ -1,32 +1,42 @@
-resource "aws_security_group" "alb_web_sg" {
-  vpc_id = var.vpc_id
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-resource "aws_lb_target_group" "tg" {
-  port     = 80
-  protocol = "HTTP"
-  vpc_id   = var.vpc_id
+provider "aws" {
+  region = "ap-south-1"
 }
 
-resource "aws_lb_listener" "listener" {
-  load_balancer_arn = aws_lb.alb.arn
-  port              = 80
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.tg.arn
+terraform {
+  backend "s3" {
+    bucket         = "akshith-terraform-state"   
+    key            = "network/terraform.tfstate"
+    region         = "ap-south-1"
+    dynamodb_table = "terraform-lock-table"
   }
 }
+
+module "network" {
+  source = "./modules/vpc"
+
+  vpc_cidr        = "10.1.0.0/16"
+  public_subnets  = ["10.1.1.0/24", "10.1.2.0/24"]
+  private_subnets = ["10.1.3.0/24", "10.1.4.0/24"]
+  azs             = ["ap-south-1a", "ap-south-1b"]
+}
+
+module "loadbalancer" {
+  source = "./modules/alb"
+
+  vpc_id         = module.network.vpc_id
+  public_subnets = module.network.public_subnets
+}
+
+module "compute" {
+  source = "./modules/ec2"
+
+  vpc_id           = module.network.vpc_id
+  private_subnets  = module.network.private_subnets
+  target_group_arn = module.loadbalancer.target_group_arn
+  alb_sg           = module.loadbalancer.alb_sg   
+
+  ami              = var.ami
+  instance_type    = var.instance_type
+  desired_capacity = var.desired_capacity
+}
+
